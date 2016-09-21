@@ -8,12 +8,15 @@ import java.nio.file.{Files, OpenOption, Paths, StandardOpenOption}
   */
 class FolderLock  (folder: => String) extends Lock {
   var isLocked = false
+  lazy val lockFolder = Paths.get(folder)
   lazy val lockFilePath = Paths.get(folder, ".lock")
   var channel: FileChannel = null
   var flock: FileLock = null
   override def lock(): Lock = {
     try {
       this synchronized {
+        if(isLocked) return this
+        if(Files.notExists(lockFolder)) Files.createDirectories(lockFolder)
         if(Files.notExists(lockFilePath)) Files.createFile(lockFilePath)
         logger.debug(s"created file $lockFilePath")
         channel = FileChannel.open(lockFilePath, StandardOpenOption.CREATE, StandardOpenOption.WRITE)
@@ -43,6 +46,7 @@ class FolderLock  (folder: => String) extends Lock {
   override def release(): Unit = {
     try {
       this synchronized {
+        if(!isLocked) return
         if (flock != null) flock.release()
         if (channel != null && channel.isOpen) channel.close()
         if (Files.exists(lockFilePath)) Files.delete(lockFilePath)

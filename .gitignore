@@ -18,3 +18,9 @@ project/plugins/project/
 
 # IntelliJ specific
 .idea
+project/project/
+src/main/java/
+src/main/scala-2.11/
+src/test/java/
+src/test/resources/
+src/test/scala-2.11/

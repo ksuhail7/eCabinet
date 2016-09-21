@@ -8,9 +8,7 @@ import fresco.logging.Logging
 trait Lock extends Logging {
   def isLocked(): Boolean
   def lock():Lock
-  def tryLock(): Boolean = {
-
-  }
+  def tryLock(): Boolean
   def release():Unit
 }
 
@@ -24,9 +22,8 @@ object LockableResource extends Logging {
     try {
       if(lock != null) {
         lock.lock()
-        logger.debug(s"acquired lock")
         codeToExecute(lockableResource)
-      }
+      } else throw new Exception("lock object is null. unable to lock resource")
     } catch {
       case ex: Exception => {
         throw ex

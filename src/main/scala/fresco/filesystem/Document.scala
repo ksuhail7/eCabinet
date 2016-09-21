@@ -44,7 +44,7 @@ object Document extends Logging {
     }
   }
 
-  def buildDocument(store: Store) (file: File): Document = {
+  def buildDocument(store: Store)(file: File) : Document = {
     val name = file.getName
     val fileSize = file.length()
     val mimeType = getMimeType(file)

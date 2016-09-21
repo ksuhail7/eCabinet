@@ -1,85 +1,54 @@
 package fresco.filesystem
 
-import java.io.File
-import java.nio.file.{DirectoryStream, Files, Path, Paths}
-import java.text.SimpleDateFormat
-import java.util.Date
+import java.nio.file.{Files, Paths}
 
-import fresco.util.{FolderLock, Lock, LockableResource}
+import fresco.util.{Lock, LockableResource, MultiFolderLock}
 
 /**
   * Created by suhail on 2016-09-08.
   */
 class Store(val id: String, val repository: Repository) extends LockableResource {
-  lazy val storeRootPath = Paths.get(repository.folder, "store")
-  lazy val storeLocation = storeRootPath.resolve(id)
-  lazy val storeLock = new StoreLock(this)
-  var initialized:Boolean = false
+  def storeLocations(): Seq[String] = {
+    repository.fileSystems.filter(_.isActive).map(_.path).map(Paths.get(_, repository.id).toString).toList
+  }
+
+  lazy val storeLock = new StoreLock(storeLocations())
+
+  var initialized: Boolean = false
 
   override def getLock(): Lock = storeLock
-  val documentBuilder = Document.buildDocument(this)
 
   initialize()
 
-  def getDocument(docId: String) = {}
-  def createDocument(document: Document) = {
-    import Document._
-    val pathToDocument = storeLocation.resolve(simpleDateFormat.format(new Date())).resolve(generateDocId)
-    println(s"path to document: $pathToDocument")
-
-  }
-
-
-  def updateDocument(document: Document) = {
-    ???
-  }
 
   def initialize(): Unit = {
-    import LockableResource._
-    if(Files.notExists(storeRootPath)) Files.createDirectory(storeRootPath)
-    this.logger.debug(s"root: $storeRootPath, location: $storeLocation")
-    if (Files.notExists(storeLocation)) Files.createDirectory(storeLocation)
-    withLockOn(this) { store =>
-      if (!initialized) {
-        val metaInf = storeLocation.resolve("meta.inf")
-        if(Files.notExists(metaInf)) Files.createFile(metaInf)
-      }
+
+    import LockableResource.withLockOn
+
+    withLockOn(this) { store => {
+      val storeLocations = store.storeLocations()
+      val storeId = store.id
+      val storePaths = storeLocations.map(Paths.get(_, "store", storeId))
+      //create missing store directories
+      storePaths.filter(Files.notExists(_)).par.foreach(path => Files.createDirectories(path))
+
+      //create meta inf files
+      val storeMetaInf = s"{storeid: ${store.id}}" //TODO
+      storePaths.map(_.resolve("meta.inf")).filter(Files.notExists(_)).par.foreach(path => {
+        Files.createFile(path)
+        val writer = Files.newBufferedWriter(path)
+        try {
+          writer.write(storeMetaInf)
+        } finally {
+          if (writer != null) writer.close()
+        }
+      })
+    }
     }
   }
 }
 
-object StoreFactory {
-  val storeCache = scala.collection.mutable.Map[String, Store]()
-  var repository: Repository = null
-  def apply(repo: Repository) = {
-    repository = repo
-    initializeStores()
-  }
+class StoreLock(folders: => Seq[String]) extends MultiFolderLock(folders)
 
-  val directoryFilter = new DirectoryStream.Filter[Path] {
-    override def accept(entry: Path): Boolean = {
-      return Files.isDirectory(entry)
-    }
-  }
 
-  def initializeStores(): Unit = {
-    import LockableResource._
-    withLockOn(repository) { repo =>
-      val storeRootPath = Paths.get(repo.folder, "store")
-      storeRootPath.toFile().listFiles().filter(_.isDirectory).foreach{ dir =>
-        storeCache.put(dir.getName, new Store(dir.getName, repository))
-      }
 
-      }
-    }
-  def getStore(id: String) = storeCache.getOrElseUpdate(id, new Store(id, repository))
-
-}
-class StoreLock(store: => Store) extends FolderLock(store.storeLocation.toString)
-
-object StoreMain extends App {
-  val repo = Repository("/Users/suhail/tmp/fresco")
-  val store = new Store("0", repo)
-  val dir = new File("/Users/suhail/tmp")
-  dir.listFiles().filter(p => p.getName.startsWith("yolinux")).foreach(file => store.buildDocument(file))
-}
