@@ -33,7 +33,7 @@ class Store(val id: String, val repository: Repository) extends LockableResource
       storePaths.filter(Files.notExists(_)).par.foreach(path => Files.createDirectories(path))
 
       //create meta inf files
-      val storeMetaInf = s"{storeid: ${store.id}}" //TODO
+      val storeMetaInf = s"{storeid: ${store.id}}" //TODO: populate with manifest in json format
       storePaths.map(_.resolve("meta.inf")).filter(Files.notExists(_)).par.foreach(path => {
         Files.createFile(path)
         val writer = Files.newBufferedWriter(path)
@@ -45,6 +45,10 @@ class Store(val id: String, val repository: Repository) extends LockableResource
       })
     }
     }
+  }
+
+  def getPreferredLocation(): String = {
+    repository.getPreferredLocation()
   }
 }
 

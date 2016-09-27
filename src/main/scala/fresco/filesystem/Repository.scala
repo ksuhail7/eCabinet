@@ -6,6 +6,8 @@ import java.nio.file.{Files, Paths}
 import com.google.gson.Gson
 import fresco.util.{FolderLock, Lock, LockableResource, MultiFolderLock}
 
+import scala.util.Random
+
 /**
   * Created by suhail on 2016-09-08.
   */
@@ -49,6 +51,11 @@ class Repository(val id: String, val name: String, val fileSystems: Seq[FileSyst
       }
     }
     }
+  }
+
+  def getPreferredLocation() : String = {
+    val paths = fileSystems.filter(_.isActive).map(_.path).map(Paths.get(_, id).toString).toList
+    paths(Random.nextInt(paths.size))
   }
 }
 
